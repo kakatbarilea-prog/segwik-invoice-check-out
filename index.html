@@ -1,0 +1,851 @@
+<!-- =========================
+     PAGE 1: CHECKOUT (after Pay Now)
+     Modern "PDF-sized" checkout page with fake loader + confirmation.
+     ========================= -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Segwik Invoice Checkout</title>
+
+  <!-- Optional modern font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+  <!-- Vue 3 (needed for fake loader + success state) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <style>
+    :root{
+      --segwik-blue:#042d60;
+      --segwik-orange:#f47a02;
+      --logo-bar:#14699F;
+
+      --bg:#ffffff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#e5e7eb;
+
+      --shadow: 0 20px 60px rgba(2, 6, 23, 0.10);
+      --radius: 18px;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background:#f5f7fa;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--ink);
+    }
+
+    /* PDF-like page canvas (A4) */
+    .wrap{
+      padding:24px;
+      display:flex;
+      justify-content:center;
+    }
+    .page{
+      width:210mm;
+      min-height:297mm;
+      background:var(--bg);
+      border-radius:12px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+
+    /* top bar */
+    .brandbar{
+      background:var(--logo-bar);
+      padding:18px 22px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+    .brand-left{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-width:0;
+    }
+    .brand-logo{ height:34px; width:auto; display:block; }
+    .brand-meta{
+      color:rgba(255,255,255,0.92);
+      font-size:12.5px;
+      line-height:1.25;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .brand-meta strong{ color:#fff; font-weight:800; }
+
+    .brand-actions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-shrink:0;
+    }
+    .icon-btn{
+      border:1px solid rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.10);
+      color:#fff;
+      width:40px;
+      height:40px;
+      border-radius:12px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition: transform .12s ease, background .12s ease;
+      text-decoration:none;
+    }
+    .icon-btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,0.16); }
+
+    .content{
+      padding:22px;
+      position:relative;
+    }
+
+    /* subtle page background accents */
+    .content::before{
+      content:"";
+      position:absolute;
+      inset:-200px -200px auto auto;
+      width:520px;
+      height:520px;
+      border-radius:50%;
+
+      pointer-events:none;
+      filter: blur(0px);
+    }
+    .content::after{
+      content:"";
+      position:absolute;
+      inset:auto auto -220px -220px;
+      width:620px;
+      height:620px;
+      border-radius:50%;
+
+      pointer-events:none;
+    }
+
+    /* layout */
+.grid{
+      position:relative;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:16px;
+      align-items:start;
+      z-index:1;
+    }
+
+
+    .card{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      overflow:hidden;
+    }
+    .card-pad{ padding:16px; }
+
+    .checkout-card{ order: 1; }
+    .payment-card{ order: 2; }
+
+    .headline{
+      margin:0 0 6px 0;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--segwik-blue);
+    }
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size: 13.5px;
+      line-height:1.4;
+    }
+
+    /* order summary */
+    .summary-top{
+      padding:16px;
+      border-bottom:1px solid var(--line);
+
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(4,45,96,0.06);
+      color: var(--segwik-blue);
+      border:1px solid rgba(4,45,96,0.10);
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .kvs{
+      padding:14px 16px;
+      display:grid;
+      gap:10px;
+    }
+    .kv{
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      font-size:13.5px;
+      color:var(--ink);
+      font-weight:700;
+      border-bottom: 1px dashed rgba(100,116,139,0.28);
+      padding-bottom:10px;
+    }
+    .kv:last-child{ border-bottom:0; padding-bottom:0; }
+    .kv .k{ color:var(--muted); font-weight:800; }
+    .kv .v{ font-weight:900; }
+
+    .grand{
+      margin-top:10px;
+      border-radius: 16px;
+      background: rgba(4,45,96,0.06);
+      border: 1px solid rgba(4,45,96,0.10);
+      padding:14px;
+    }
+    .grand .label{
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.10em;
+      font-weight:900;
+      color: var(--segwik-blue);
+      margin-bottom: 8px;
+    }
+    .grand .money{
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing:-0.02em;
+      color: var(--segwik-blue);
+      line-height:1.1;
+    }
+    .grand .mini{
+      margin-top:8px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      font-size:12.5px;
+      color:var(--muted);
+    }
+
+    /* Payment form */
+    .form-head{
+      padding:16px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      background: #F0F3F6;
+    }
+    .form-title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .form-title h2{
+      margin:0;
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--segwik-blue);
+      letter-spacing:.02em;
+    }
+    .form-title p{
+      margin:0;
+      font-size:12.5px;
+      color:var(--muted);
+      line-height:1.3;
+    }
+
+    .badges{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-shrink:0;
+      color: rgba(4,45,96,0.85);
+    }
+    .badge{
+      width:38px;
+      height:28px;
+      border-radius:10px;
+      border: 1px solid rgba(4,45,96,0.14);
+      background: rgba(255,255,255,0.75);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+    }
+
+    .form{
+      padding:16px;
+      display:grid;
+      gap:12px;
+    }
+
+    .field{
+      display:grid;
+      gap:7px;
+    }
+    .label{
+      font-size:12px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+    }
+    .label .hint{
+      text-transform:none;
+      letter-spacing:0;
+      font-weight:700;
+      font-size:12px;
+      color: rgba(100,116,139,.9);
+    }
+
+    .input{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 12px 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      transition: border-color .12s ease, box-shadow .12s ease;
+    }
+    .input:focus-within{
+      border-color: rgba(4,45,96,0.35);
+      box-shadow: 0 0 0 4px rgba(4,45,96,0.08);
+    }
+    .input i{ color: rgba(4,45,96,0.55); }
+    input{
+      border:0;
+      outline:0;
+      width:100%;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      background: transparent;
+    }
+    input::placeholder{ color: rgba(100,116,139,.65); font-weight:600; }
+
+    .two{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .three{
+      display:grid;
+      grid-template-columns: 1.2fr .9fr .9fr;
+      gap:12px;
+    }
+
+    /* Pay button with loader */
+    .paybar{
+      padding: 14px 16px 16px;
+      border-top: 1px solid var(--line);
+      display:grid;
+      gap:10px;
+    }
+    .paybtn{
+      width:100%;
+      border:0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: var(--segwik-orange);
+      color:#fff;
+      font-weight: 900;
+      letter-spacing:.02em;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      cursor:pointer;
+      box-shadow: 0 12px 26px rgba(244,122,2,0.25);
+      transition: transform .12s ease, filter .12s ease;
+      position:relative;
+    }
+    .paybtn:hover{ transform: translateY(-1px); filter: brightness(1.02); }
+    .paybtn:active{ transform: translateY(0px); }
+    .paybtn[disabled]{
+      opacity:.88;
+      cursor: wait;
+      transform:none !important;
+      filter:none !important;
+    }
+
+    .spinner{
+      width:16px;
+      height:16px;
+      border-radius:50%;
+      border: 2px solid rgba(255,255,255,.55);
+      border-top-color:#fff;
+      animation: spin .9s linear infinite;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+
+    .paymeta{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
+    /* success overlay (after fake payment) */
+    .overlay{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(6px);
+      z-index:5;
+      padding: 24px;
+    }
+    .overlay-card{
+      width:min(520px, 100%);
+      border-radius: 22px;
+      border: 1px solid rgba(4,45,96,0.14);
+      background: #fff;
+      box-shadow: 0 30px 90px rgba(2,6,23,0.14);
+      overflow:hidden;
+    }
+    .overlay-top{
+      padding: 16px;
+      background:
+        radial-gradient(900px 260px at 10% 0%, rgba(4,45,96,0.12), transparent 58%),
+        radial-gradient(900px 260px at 90% 0%, rgba(244,122,2,0.14), transparent 58%),
+        #fff;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .check{
+      width:44px;
+      height:44px;
+      border-radius: 14px;
+      background: rgba(4,45,96,0.08);
+      border:1px solid rgba(4,45,96,0.12);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color: var(--segwik-blue);
+      font-size: 18px;
+      flex-shrink:0;
+    }
+    .overlay-top h3{
+      margin:0;
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--segwik-blue);
+      letter-spacing:.02em;
+    }
+    .overlay-top p{
+      margin:4px 0 0 0;
+      font-size: 12.5px;
+      color: var(--muted);
+      font-weight: 700;
+      line-height:1.3;
+    }
+    .overlay-body{
+      padding: 16px;
+      display:grid;
+      gap:10px;
+    }
+    .overlay-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:14px;
+      font-weight:800;
+      font-size: 13.5px;
+      color: var(--ink);
+      border-bottom: 1px dashed rgba(100,116,139,0.28);
+      padding-bottom: 10px;
+    }
+    .overlay-row:last-child{ border-bottom:0; padding-bottom:0; }
+    .overlay-row .k{ color: var(--muted); font-weight:900; }
+    .overlay-actions{
+      padding: 14px 16px 16px;
+      border-top:1px solid var(--line);
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      align-items:center;
+    }
+    .btn{
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 900;
+      letter-spacing:.02em;
+      border:1px solid rgba(4,45,96,0.14);
+      background:#fff;
+      color: var(--segwik-blue);
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+    }
+    .btn.primary{
+      border:0;
+      background: var(--segwik-orange);
+      color:#fff;
+      box-shadow: 0 12px 26px rgba(244,122,2,0.25);
+    }
+
+    /* THANK YOU POPUP (reusing PAGE 2 styling inside the overlay) */
+    .thank-card{
+      position:relative;
+      z-index:1;
+      width:min(640px, 100%);
+      background:#fff;
+      border:1px solid rgba(4,45,96,0.14);
+      border-radius:22px;
+      box-shadow: 0 30px 90px rgba(2,6,23,0.12);
+      overflow:hidden;
+    }
+    .thank-top{
+      padding:18px;
+      background: #E5E9EE;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      gap:14px;
+    }
+    .thank-check{
+      width:54px;
+      height:54px;
+      border-radius:18px;
+      background: rgba(4,45,96,0.08);
+      border:1px solid rgba(4,45,96,0.12);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color: var(--segwik-blue);
+      font-size: 22px;
+      flex-shrink:0;
+    }
+    .thank-title{
+      margin:0;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing:-0.02em;
+      color: var(--segwik-blue);
+    }
+    .thank-sub{
+      margin:6px 0 0 0;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 700;
+      line-height:1.35;
+    }
+    .thank-body{
+      padding: 16px 18px 18px;
+      display:grid;
+      gap:10px;
+    }
+    .thank-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:14px;
+      font-weight:800;
+      font-size: 13.5px;
+      color: var(--ink);
+      border-bottom: 1px dashed rgba(100,116,139,0.28);
+      padding-bottom: 10px;
+    }
+    .thank-row:last-child{ border-bottom:0; padding-bottom:0; }
+    .thank-row .k{ color: var(--muted); font-weight:900; }
+
+    .thank-actions{
+      padding: 14px 18px 18px;
+      border-top:1px solid var(--line);
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      align-items:center;
+    }
+
+    /* print */
+    @media print{
+      body{ background:#fff; }
+      .wrap{ padding:0; }
+      .page{ box-shadow:none; border-radius:0; }
+      .brand-actions{ display:none !important; }
+      .overlay{ display:none !important; }
+    }
+    @page{ size:A4; margin: 10mm; }
+
+    /* responsive preview only */
+    @media (max-width: 980px){
+      .page{ width:100%; min-height:auto; }
+      .grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" class="wrap">
+    <div class="page">
+
+      <header class="brandbar">
+        <div class="brand-left">
+          <img class="brand-logo"
+               src="https://d34hmiuaex7c0.cloudfront.net/2952/uploads/cmaspages/gallery/galleryitem_1765289459792.png"
+               alt="Segwik Logo" />
+          <div class="brand-meta" title="[segwik::Basicinfofield display=account_name]">
+            <strong>[segwik::Basicinfofield display=account_name]</strong><br/>
+            [segwik::Basicinfofield display=bus_phone] · [segwik::Basicinfofield display=bus_email]<br/>
+            [segwik::Basicinfofield display=bus_add], [segwik::Basicinfofield display=city_name], [segwik::Basicinfofield display=state_name] [segwik::Basicinfofield display=zip_name]
+          </div>
+        </div>
+
+        <div class="brand-actions">
+          <button class="icon-btn" type="button" @click="printPage" aria-label="Print / Save as PDF" title="Print / Save as PDF">
+            <i class="fa-solid fa-file-pdf"></i>
+          </button>
+          <a class="icon-btn" href="#" aria-label="Back to Invoice" title="Back to Invoice">
+            <i class="fa-solid fa-arrow-left"></i>
+          </a>
+        </div>
+      </header>
+
+      <main class="content">
+
+        <div class="grid">
+          <!-- Left: Payment -->
+          <section class="card payment-card">
+            <div class="form-head">
+              <div class="form-title">
+                <h2>Payment Details</h2>
+              </div>
+              <div class="badges" aria-label="Card Types">
+                <div class="badge" title="Visa"><i class="fa-brands fa-cc-visa"></i></div>
+                <div class="badge" title="Mastercard"><i class="fa-brands fa-cc-mastercard"></i></div>
+                <div class="badge" title="Amex"><i class="fa-brands fa-cc-amex"></i></div>
+              </div>
+            </div>
+
+            <div class="form">
+              <!-- Cardholder -->
+              <div class="field">
+                <div class="label">
+                  Cardholder Name
+                </div>
+                <div class="input">
+                  <i class="fa-solid fa-user"></i>
+                  <input type="text" placeholder="Jane Doe" />
+                </div>
+              </div>
+
+              <!-- Card number -->
+              <div class="field">
+                <div class="label">
+                  Card Number
+
+                </div>
+                <div class="input">
+                  <i class="fa-regular fa-credit-card"></i>
+                  <input type="text" inputmode="numeric" placeholder="1234 5678 9012 3456" />
+                </div>
+              </div>
+
+              <div class="three">
+                <div class="field">
+                  <div class="label">Expiry</div>
+                  <div class="input">
+                    <i class="fa-regular fa-calendar"></i>
+                    <input type="text" placeholder="MM/YY" />
+                  </div>
+                </div>
+
+                <div class="field">
+                  <div class="label">CVC</div>
+                  <div class="input">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="text" inputmode="numeric" placeholder="123" />
+                  </div>
+                </div>
+
+                <div class="field">
+                  <div class="label">ZIP</div>
+                  <div class="input">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <input type="text" placeholder="07712" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Optional email (still fake) -->
+              <div class="field">
+                <div class="label">
+                  Receipt Email
+
+                </div>
+                <div class="input">
+                  <i class="fa-regular fa-envelope"></i>
+                  <input type="email" placeholder="[billing_contact_primary_email]" />
+                </div>
+              </div>
+            </div>
+
+            <div class="paybar">
+              <button class="paybtn" type="button" @click="fakePay" :disabled="paying">
+                <template v-if="!paying">
+                  <i class="fa-solid fa-bolt"></i>
+                  Pay $[amount_due]
+                </template>
+                <template v-else>
+                  <span class="spinner" aria-hidden="true"></span>
+                  Processing…
+                </template>
+              </button>
+
+              <div class="paymeta">
+                <span><i class="fa-solid fa-shield-halved"></i> All transactions are secure and encrypted.</span>
+                <span>Invoice: <strong>[quote_id]</strong></span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Right: Order summary -->
+          <aside class="card checkout-card">
+            <div class="summary-top">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div>
+                  <h1 class="headline">Checkout</h1>
+                  <p class="sub">Review the totals below and submit payment.</p>
+                </div>
+                <span class="pill"><i class="fa-solid fa-receipt"></i> [quote_id]</span>
+              </div>
+            </div>
+
+            <div class="kvs">
+              <div class="kv">
+                <span class="k">Billed To</span>
+                <span class="v">[cust_firstname] [cust_lastname]</span>
+              </div>
+              <div class="kv">
+                <span class="k">Company</span>
+                <span class="v">[quote_company_name]</span>
+              </div>
+              <div class="kv">
+                <span class="k">Due Date</span>
+                <span class="v">[quote_valid]</span>
+              </div>
+
+              <div class="grand">
+                <div class="label">Grand Total</div>
+                <div class="money">$[total_amout]</div>
+                <div class="mini">
+                  <span>Amount Due</span>
+                  <strong>$[amount_due]</strong>
+                </div>
+                <div class="mini">
+                  <span>Discount</span>
+                  <strong>[discount_in_percentage]% · $[total_discount]</strong>
+                </div>
+              </div>
+
+              <div style="display:grid; gap:8px; margin-top: 10px; color: var(--muted); font-size:12.5px; font-weight:700;">
+                <div><i class="fa-regular fa-file-lines"></i> Invoice Date: <strong>[created_on]</strong></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+<!-- Success overlay -->
+<div class="overlay" v-if="paid" aria-label="Payment Success">
+  <div class="thank-card" role="status" aria-label="Thank You">
+    <div class="thank-top">
+      <div class="thank-check"><i class="fa-solid fa-check"></i></div>
+      <div>
+        <h1 class="thank-title">Thank you — payment received.</h1>
+        <p class="thank-sub">Your payment for invoice <strong>[quote_id]</strong> has been confirmed.</p>
+      </div>
+    </div>
+
+    <div class="thank-body">
+      <div class="thank-row">
+        <span class="k">Amount Paid</span>
+        <span>$[amount_due]</span>
+      </div>
+      <div class="thank-row">
+        <span class="k">Grand Total</span>
+        <span>$[total_amout]</span>
+      </div>
+      <div class="thank-row">
+        <span class="k">Receipt Email</span>
+        <span>[billing_contact_primary_email]</span>
+      </div>
+    </div>
+
+    <div class="thank-actions">
+
+      <a class="btn primary" href="https://segwik.com/">
+        <i class="fa-solid fa-house"></i>
+        Done
+      </a>
+    </div>
+  </div>
+</div>
+
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          paying: false,
+          paid: false
+        };
+      },
+      methods: {
+        printPage(){
+          window.print();
+        },
+        fakePay(){
+          // Always allow checkout, even if fields are empty (demo behavior).
+          if (this.paying) return;
+
+          this.paying = true;
+
+          // Nice fake loader timing
+          setTimeout(() => {
+            this.paying = false;
+            this.paid = true;
+          }, 1400);
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
